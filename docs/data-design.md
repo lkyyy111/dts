@@ -70,3 +70,35 @@ In the frontend, we use `watermelonDB`, which offers local-first capacity. The b
   - longitude(经度)：Float
 - battery: Int (0-100)
 - updated_at(最后一次更新的时间戳): Number
+
+## APIs
+
+http apis:
+  - `POST /api/v1/spaces`
+  - `GET /api/v1/sync`
+  - `POST /api/v1/sync`
+  - `POST /api/v1/photo`
+  - `POST /api/v1/avator` (TODO)
+websocket apis:
+  - `/api/v1/ws`
+
+## How to use?
+
+1. 本地，不涉及与其他客户端同步，此时只需要正常读写本地数据库即可
+2. 涉及同步：
+  - 同步以一个空间为单位，也就是说用户可以手动选择一个空间“开启同步共享”或者“不共享仅自用”
+  - 首先用户需要通过`POST /api/v1/spaces`上传一个user和space的绑定关系：
+    - 客户端每次同步时均需要先`POST /api/v1/spaces`，因为无法确定上传到的服务器是网络服务器，还是未来局域网同步时的p2p中的服务器
+    - 服务器需处理此请求，根据本地数据库检查是否有更新需要插入
+  - 然后用户进行`POST /api/v1/sync`和`GET /api/v1/sync`，同步数据：
+    - 客户端需实现watermelonDB提供的同步接口，在其中调用上述两个sync api
+    - 客户端需分别处理这两个api请求
+  - 当完成一次数据同步后
+    - 客户端需要检查avator和photo记录：
+      - 如果local_uri为空，说明其他客户端有图片更新，需要根据remote_url下载到本地，然后填入local_uri
+      - 如果remote_url为空，说明本地更新的图片未上传，需要通过`POST /api/v1/photo`和`POST /api/v1/avator`上传，将返回的remote_url填入本地更新即可
+    - 服务器需要处理`POST /api/v1/photo`和`POST /api/v1/avator`请求
+    - 本功能模块有以下设计疑问：仅考虑服务器情况，此设计没有问题，但如果变为局域网p2p同步，需要新的办法来检测图片的上传下载
+3. 涉及实时：
+  - 客户端直接使用websocket连接收发信息即可
+  - 服务器需处理websocket连接，实现同一个空间中多个websocket连接的消息转发
