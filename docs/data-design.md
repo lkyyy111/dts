@@ -25,7 +25,6 @@ In the frontend, we use `watermelonDB`, which offers local-first capacity. The b
 |                       | avatar_remote_url | string   | 头像url（上传到云端的对象存储URL）                              |                                                |
 |                       | created_at        | Number   | 这条记录初次记录的时间戳                                        |                                                |
 |                       | updated_at        | Number   | 这条记录上次被修改的时间戳                                      |                                                |
-|                       | deleted_at        | Number   | 这条记录删除的时间戳                                            | 服务器db没有此字段，为了统一可有此字段但留空   |
 | **spaces** (旅行空间) | id                | String   | 空间唯一标识(ULID)                                              |                                                |
 |                       | name              | String   | 空间名称                                                        |                                                |
 |                       | created_at        | Number   | 这条记录初次记录的时间戳                                        |                                                |
@@ -35,7 +34,7 @@ In the frontend, we use `watermelonDB`, which offers local-first capacity. The b
 |                       | user_id           | String   | 外键，关联 users                                                |                                                |
 |                       | created_at        | Number   | 这条记录初次记录的时间戳                                        |                                                |
 |                       | updated_at        | Number   | 这条记录上次被修改的时间戳                                      |                                                |
-|                       | deleted_at        | Number   | 这条记录被删除的时间戳                                          |                                                |
+|                       | deleted_at        | Number   | 这条记录被删除的时间戳                                          | 客户端db没有此字段                             |
 | -----                 | -----             | -----    | -----                                                           |                                                |
 | **photos** (照片)     | id                | String   | 照片ID(ULID)                                                    |                                                |
 |                       | space_id          | String   | 所属空间ID                                                      |                                                |
@@ -54,7 +53,7 @@ In the frontend, we use `watermelonDB`, which offers local-first capacity. The b
 |                       | description       | String   | 消费描述 (如: 晚餐)                                             |                                                |
 |                       | created_at        | Number   | 这条记录初次记录的时间戳                                        |                                                |
 |                       | upadted_at        | Number   | 这条记录上次被修改的时间戳                                      |                                                |
-|                       | deleted_at        | Number   | 这条记录被删除的时间戳                                          |                                                |
+|                       | deleted_at        | Number   | 这条记录被删除的时间戳                                          | 客户端db没有此字段                             |
 | **comments** (评论)   | id                | String   | 评论ID(ULID)                                                    |                                                |
 |                       | content           | String   | 评论内容                                                        |                                                |
 |                       | commenter_id      | String   | 评论者id                                                        |                                                |
@@ -62,13 +61,13 @@ In the frontend, we use `watermelonDB`, which offers local-first capacity. The b
 |                       | commented_at      | Number   | 用户看到的评论时间                                              |                                                |
 |                       | created_at        | Number   | 这条记录初次记录的时间戳                                        |                                                |
 |                       | updated_at        | Number   | 这条记录上次被修改的时间戳                                      |                                                |
-|                       | deleted_at        | Number   | 这条记录被删除的时间戳                                          |                                                |
+|                       | deleted_at        | Number   | 这条记录被删除的时间戳                                          | 客户端db没有此字段                             |
 | **posts**（帖子）     |                   |          | posts意味着多张照片的集合，评论和照片描述需以一个post为基本单位 |                                                |
 |                       | id                | String   | 帖子ID                                                          |                                                |
 |                       | poster_id         | String   | 贴主                                                            | 此字段需商议，目前做保留处理，和照片上传者一致 |
 |                       | created_at        | Number   | 这条记录初次记录的时间戳                                        |                                                |
 |                       | updated_at        | Number   | 这条记录上次被修改的时间戳                                      |                                                |
-|                       | deleted_at        | Number   | 这条记录被删除的时间戳                                          |                                                |
+|                       | deleted_at        | Number   | 这条记录被删除的时间戳                                          | 客户端db没有此字段                             |
 
 - 时间戳采用13位Unix时间戳
 - 注意本地uri和云端url，一般来说，先同步数据库，然后决定有无头像或照片要上传，上传后才能够得到云端url，所以可能会出现暂时为空的情况
