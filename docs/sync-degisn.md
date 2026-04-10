@@ -26,4 +26,27 @@
   - 需要区分`created_at`/`updated_at`
 
 ## 同步过程
-1. 用户同步空间，首先调用`POST spaces`
+
+假设以空间为同步单位，用户点击“同步”后，同步过程如下：
+
+1. 客户端 `POST spaces`，参数userid和spaceid
+2. 客户端 `GET sync`, 参数user_id, space_id, last_pulled_at. 
+  1. 服务器的处理方式如下：
+    1. 对于user，space, space_members表：
+      1. 先根据space_id做筛选，选出space内的user，space，space_members
+      2. 直接把筛选出来的数据塞到changes的created里
+    2. 对于其他数据表：
+      1. 先根据space_id做筛选，选出space内的数据
+      2. 根据last_pulled_at分别往changes里塞相应的created，updated，deleted
+    3. 返回此回复。注意服务器要把客户端没有的字段删去。
+  2. 客户端接收到回复，watermelonDB处理此回复
+3. 客户端 `POST sync`，
+  1. 客户端会直接对watermelon本地自动生成的changes，调用API即可。其中：
+    1. photo的remote_url可能是空的
+    2. // TODO：watermelonDB自动生成的changes不会根据空间做筛选，所以上传实际上是全局的，暂时先不管
+  2. 服务器接收到push过来的change，
+    1. // TODO
+4. 客户端 检查photos（检查所有记录，不要按照space_id筛选，因为可能有其他空间本地照片post失败的情况）：
+  1. remote_url为空，说明是你添加的图片。你需要post该photo，服务器会把remote_url填入服务器的数据库，你下次sync则会得到该remote_url。
+  4. 前端需处理photo表查到photo记录，但local_uri为空的异常情况
+  5. 这意味着，事实上photo只有create和delete，不会有update
