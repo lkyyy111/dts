@@ -3,13 +3,11 @@ package db
 import "gorm.io/gorm"
 
 type User struct {
-	ID               string `json:"id" gorm:"type:varchar(26);primaryKey"`
-	Nickname         string `json:"nickname" gorm:"type:text;not null;default:''"`
-	CreatedAt        int64  `json:"created_at" gorm:"column:created_at;not null;index;autoCreateTime:false"`
-	UpdatedAt        int64  `json:"updated_at" gorm:"column:updated_at;not null;index;autoUpdateTime:false"`
-	DeletedAt        int64  `json:"deleted_at" gorm:"column:deleted_at;not null;default:0;index"`
-	LastModified     int64  `json:"-" gorm:"column:last_modified;not null;default:0;index"`
-	ServerCreatedAt  int64  `json:"-" gorm:"column:server_created_at;not null;default:0;index"`
+	ID              string `json:"id" gorm:"type:varchar(26);primaryKey"`
+	Nickname        string `json:"nickname" gorm:"type:text;not null;default:''"`
+	DeletedAt       int64  `json:"deleted_at" gorm:"column:deleted_at;not null;default:0;index"`
+	LastModified    int64  `json:"-" gorm:"column:last_modified;not null;default:0;index"`
+	ServerCreatedAt int64  `json:"-" gorm:"column:server_created_at;not null;default:0;index"`
 }
 
 func (User) TableName() string { return "users" }
@@ -17,8 +15,6 @@ func (User) TableName() string { return "users" }
 type Space struct {
 	ID              string `json:"id" gorm:"type:varchar(26);primaryKey"`
 	Name            string `json:"name" gorm:"type:text;not null;default:''"`
-	CreatedAt       int64  `json:"created_at" gorm:"column:created_at;not null;index;autoCreateTime:false"`
-	UpdatedAt       int64  `json:"updated_at" gorm:"column:updated_at;not null;index;autoUpdateTime:false"`
 	DeletedAt       int64  `json:"deleted_at" gorm:"column:deleted_at;not null;default:0;index"`
 	LastModified    int64  `json:"-" gorm:"column:last_modified;not null;default:0;index"`
 	ServerCreatedAt int64  `json:"-" gorm:"column:server_created_at;not null;default:0;index"`
@@ -28,12 +24,10 @@ func (Space) TableName() string { return "spaces" }
 
 type SpaceMember struct {
 	ID              string `json:"id" gorm:"type:text;primaryKey"`
-	SpaceID         string `json:"space_id" gorm:"column:space_id;type:varchar(26);not null;index:idx_space_members_space_updated,priority:1;index:idx_space_members_space_deleted,priority:1"`
+	SpaceID         string `json:"space_id" gorm:"column:space_id;type:varchar(26);not null;index:idx_space_members_space_lm,priority:1;index:idx_space_members_space_deleted,priority:1"`
 	UserID          string `json:"user_id" gorm:"column:user_id;type:varchar(26);not null;index"`
-	CreatedAt       int64  `json:"created_at" gorm:"column:created_at;not null;index;autoCreateTime:false"`
-	UpdatedAt       int64  `json:"updated_at" gorm:"column:updated_at;not null;index:idx_space_members_space_updated,priority:2;autoUpdateTime:false"`
 	DeletedAt       int64  `json:"deleted_at" gorm:"column:deleted_at;not null;default:0;index:idx_space_members_space_deleted,priority:2"`
-	LastModified    int64  `json:"-" gorm:"column:last_modified;not null;default:0;index"`
+	LastModified    int64  `json:"-" gorm:"column:last_modified;not null;default:0;index:idx_space_members_space_lm,priority:2"`
 	ServerCreatedAt int64  `json:"-" gorm:"column:server_created_at;not null;default:0;index"`
 }
 

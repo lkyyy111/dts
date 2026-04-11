@@ -70,29 +70,76 @@ func InitDB(dsn string) error {
 }
 
 func backfillServerSyncColumns(db *gorm.DB) error {
-	tables := []string{"users", "spaces", "space_members", "photos", "expenses", "posts", "comments"}
-	for _, table := range tables {
-		hasLastModified, err := hasColumn(db, table, "last_modified")
-		if err != nil {
+	relationTables := []string{"users", "spaces", "space_members"}
+	contentTables := []string{"photos", "expenses", "posts", "comments"}
+	for _, table := range relationTables {
+		if err := backfillServerSyncColumnsRelation(db, table); err != nil {
 			return err
 		}
-		hasServerCreatedAt, err := hasColumn(db, table, "server_created_at")
-		if err != nil {
+	}
+	for _, table := range contentTables {
+		if err := backfillServerSyncColumnsContent(db, table); err != nil {
 			return err
 		}
-		if !hasLastModified || !hasServerCreatedAt {
-			continue
-		}
+	}
+	return nil
+}
+
+func backfillServerSyncColumnsContent(db *gorm.DB, table string) error {
+	hasLastModified, err := hasColumn(db, table, "last_modified")
+	if err != nil {
+		return err
+	}
+	hasServerCreatedAt, err := hasColumn(db, table, "server_created_at")
+	if err != nil {
+		return err
+	}
+	if !hasLastModified || !hasServerCreatedAt {
+		return nil
+	}
+	queryCreated := "UPDATE " + table + " SET server_created_at = CASE WHEN created_at > 0 THEN created_at ELSE updated_at END WHERE server_created_at = 0"
+	if err := db.Exec(queryCreated).Error; err != nil {
+		return err
+	}
+	queryModified := "UPDATE " + table + " SET last_modified = GREATEST(server_created_at, updated_at, deleted_at) WHERE last_modified = 0"
+	return db.Exec(queryModified).Error
+}
+
+// backfillServerSyncColumnsRelation 针对已移除客户端 created_at/updated_at 的关系表；若历史库仍保留这两列则沿用旧回填逻辑。
+func backfillServerSyncColumnsRelation(db *gorm.DB, table string) error {
+	hasLastModified, err := hasColumn(db, table, "last_modified")
+	if err != nil {
+		return err
+	}
+	hasServerCreatedAt, err := hasColumn(db, table, "server_created_at")
+	if err != nil {
+		return err
+	}
+	if !hasLastModified || !hasServerCreatedAt {
+		return nil
+	}
+	hasCreatedAt, err := hasColumn(db, table, "created_at")
+	if err != nil {
+		return err
+	}
+	hasUpdatedAt, err := hasColumn(db, table, "updated_at")
+	if err != nil {
+		return err
+	}
+	if hasCreatedAt && hasUpdatedAt {
 		queryCreated := "UPDATE " + table + " SET server_created_at = CASE WHEN created_at > 0 THEN created_at ELSE updated_at END WHERE server_created_at = 0"
 		if err := db.Exec(queryCreated).Error; err != nil {
 			return err
 		}
 		queryModified := "UPDATE " + table + " SET last_modified = GREATEST(server_created_at, updated_at, deleted_at) WHERE last_modified = 0"
-		if err := db.Exec(queryModified).Error; err != nil {
-			return err
-		}
+		return db.Exec(queryModified).Error
 	}
-	return nil
+	q1 := "UPDATE " + table + " SET server_created_at = last_modified WHERE server_created_at = 0 AND last_modified > 0"
+	if err := db.Exec(q1).Error; err != nil {
+		return err
+	}
+	q2 := "UPDATE " + table + " SET last_modified = GREATEST(COALESCE(NULLIF(server_created_at,0), 0), COALESCE(NULLIF(deleted_at,0), 0)) WHERE last_modified = 0 AND (server_created_at > 0 OR deleted_at > 0)"
+	return db.Exec(q2).Error
 }
 
 // renameLegacyServerCreatedColumn 将旧列 server_created 改名为 server_created_at（仅当新列尚不存在时）。

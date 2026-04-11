@@ -42,15 +42,25 @@
   2. 客户端接收到回复，watermelonDB处理此回复
 3. 客户端 `POST sync`，
   1. 客户端会直接对watermelon本地自动生成的changes，调用API即可。其中：
-    1. photo的remote_url可能是空的
-    2. watermelonDB自动生成的changes不会根据空间做筛选，所以上传实际上是全局的，暂时先不管
-    3. WatermelonDB 自动生成的 changes 是全局 changes，而不是按某个 space_id 自动筛过的 changes。当前阶段客户端可先直接全局 push，服务端负责按记录本身的外键和约束落库；真正的“按空间隔离”主要体现在 Pull：GET /sync?space_id=... 只返回该空间相关的 users / spaces / space_members / posts / photos / expenses / comments。后续如有需要，可在前端 pushChanges 前自行按当前空间做预过滤。
-  2. 服务器接收到push过来的change后，在单个事务中按表遍历 created / updated / deleted：
-    1. created：存在则 update，不存在则 insert；insert 时写入服务端字段 server_created=nowMillis()、last_modified=nowMillis()
-    2. updated：存在时先做冲突检测，若记录的 last_modified > last_pulled_at，则返回 409 conflict；否则 update 并刷新 last_modified=nowMillis()；不存在则按 insert 处理
-    3. deleted：不物理删除，而是软删除，设置 deleted_at=nowMillis()、last_modified=nowMillis()；不存在则忽略
-    4. 对 space_members，服务端按 space_id + "_" + user_id 重新规范化主键，避免客户端传错 id
-    5. 整体成功返回 200 和 { "ok": true }，任意失败则事务回滚
+    1. `photo` 的 `remote_url` 可能是空的
+    2. WatermelonDB 自动生成的 `changes` 是全局 changes，而不是按某个 `space_id` 自动筛过的 changes
+    3. 当前阶段客户端可先直接全局 push，服务端负责按记录本身的外键、合法性和约束落库；真正的“按空间隔离”主要体现在 Pull：`GET /sync?space_id=...` 只返回该空间相关的 `users / spaces / space_members / posts / photos / expenses / comments`
+    4. 后续如有需要，前端可在 `pushChanges` 前自行按当前空间做预过滤
+  2. 服务器接收到 push 过来的 `changes` 后，在单个事务中按表遍历 `created / updated / deleted`。处理方式分为两类：
+    1. 对于 `user`，`space`，`space_members` 表：
+      1. 这三张表属于空间同步的核心关系表，主要作用是维护“空间是谁、空间里有哪些人、这些人分别是谁”
+      2. 服务端先按记录本身的主键和关系进行校验与规范化，其中 `space_members.id` 按 `{space_id}_{user_id}` 重新生成，避免客户端传错 id
+      3. `created`：若记录不存在则插入；若已存在则按更新处理，并恢复 `deleted_at`
+      4. `updated`：若记录不存在则按插入处理；若已存在则按更新处理，并刷新 `last_modified`
+      5. `deleted`：不物理删除，而是设置 `deleted_at`
+      6. 这三张表主要承担关系维护职责，不按普通业务数据那样依赖客户端的 `created_at / updated_at` 做同步判断
+    2. 对于其他数据表（`photos`，`expenses`，`comments`，`posts`）：
+      1. 先根据记录本身的 `space_id` 或关联关系确认其归属空间
+      2. `created`：若记录不存在则插入；若已存在则按更新处理
+      3. `updated`：若记录不存在则按插入处理；若已存在则先做冲突检测，若服务端该记录的 `last_modified > last_pulled_at`，则返回 `409 conflict`；否则更新并刷新 `last_modified`
+      4. `deleted`：不物理删除，而是设置 `deleted_at`
+      5. 对这些数据表，服务端使用 `last_modified / server_created_at / deleted_at` 来支持后续 Pull 时的 `created / updated / deleted` 分类
+    3. 整体成功返回 `200` 和 `{ "ok": true }`，任意失败则事务回滚
 4. 客户端 检查photos（检查所有记录，不要按照space_id筛选，因为可能有其他空间本地照片post失败的情况）：
   1. remote_url为空，说明是你添加的图片。你需要post该photo，服务器会把remote_url填入服务器的数据库，你下次sync则会得到该remote_url。
   2. 前端需处理photo表查到photo记录，但local_uri为空的异常情况
