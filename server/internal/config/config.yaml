@@ -6,5 +6,9 @@ port: 8088
 # 用于本服务端连接数据库
 db_host: 127.0.0.1
 db_port: 5432
+db_user: root
+db_password: root
+db_name: dts_db
+db_sslmode: disable
 # 静态文件托管目录
 static_file_host_dir: ./uploads

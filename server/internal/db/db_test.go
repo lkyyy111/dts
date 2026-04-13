@@ -7,7 +7,7 @@ import (
 // This function tests the connection of the database
 // It does NOT read the config
 func TestInitDB(t *testing.T) {
-	dsn := "host=localhost user=root password=root dbname=dts_db port=5432 sslmode=disable TimeZone=Asia/Shanghai"
+	dsn := "host=localhost user=dts password=dts123 dbname=dts port=5432 sslmode=disable TimeZone=Asia/Shanghai"
 
 	err := InitDB(dsn)
 	if err != nil {

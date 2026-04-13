@@ -9,16 +9,13 @@ import (
 
 var DB *gorm.DB
 
-// init the database connection
-// param:
-// - dsn: data source name
 func InitDB(dsn string) error {
 	var err error
 
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 
 	if err != nil {
-		log.Printf("数据库连接失败: %v", err)
+		log.Printf("Failed to connect to database: %v", err)
 		return err
 	}
 
@@ -26,10 +23,15 @@ func InitDB(dsn string) error {
 	if err != nil {
 		return err
 	}
-	
-	sqlDB.SetMaxIdleConns(10)  // 空闲连接池最大数量
-	sqlDB.SetMaxOpenConns(100)  // 打开数据库连接的最大数量
 
-	log.Printf("数据库连接成功！")
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetMaxOpenConns(100)
+
+	if err := AutoMigrateAll(); err != nil {
+		log.Printf("Failed to run database migrations: %v", err)
+		return err
+	}
+
+	log.Printf("Database connected successfully!")
 	return nil
 }

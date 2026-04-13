@@ -11,6 +11,10 @@ type Config struct {
 	Port int `mapstructure:"port"`
 	DbHost string `mapstructure:"db_host"`
 	DbPort int `mapstructure:"db_port"`
+	DbUser string `mapstructure:"db_user"`
+	DbPassword string `mapstructure:"db_password"`
+	DbName string `mapstructure:"db_name"`
+	DbSSLMode string `mapstructure:"db_sslmode"`
 	SFHD string `mapstructure:"static_file_host_dir"`
 }
 

@@ -72,8 +72,8 @@ In the frontend, we use `watermelonDB`, which offers local-first capacity. The b
 - created_at和updated_at由watermelonDB在定义model时使用`@date('created_at')`和`@date('updated_at')`装饰器产生，用于数据同步时的创建/更新
 - deleted_at字段用于服务器实现“软删除”
 - 业务逻辑注意事项：
-  - users， spaces，space_members这三张表涉及应用的核心逻辑，写代码时需要特别留意
-  - photos，expenses，comments, posts本质上都是数据，实现逻辑应该是一致的
+  - `users`、`spaces`、`space_members` 为**核心关系表**：Pull 时整包放入 `created`，Push 时不做 delete/conflict/`last_modified` 逻辑，见 `docs/sync-degisn.md`。
+  - `photos`、`expenses`、`comments`、`posts` 为**普通数据表**，增量同步与冲突规则一致。
 - photo的local_uri统一为：`${App存储目录}/photos/${photo_id}.jpg`.前端需处理文件不存在的异常情况。
 
 ## Real-time Data
