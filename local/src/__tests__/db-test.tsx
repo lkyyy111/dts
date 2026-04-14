@@ -22,6 +22,7 @@ jest.mock("@/model", () => {
     database: {
       collections: {
         get: jest.fn(() => ({
+          find: jest.fn().mockRejectedValue(new Error("not found")),
           query: jest.fn(() => ({
             observe: jest.fn(() => ({
               subscribe: mockSubscribe,
