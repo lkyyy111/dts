@@ -3,6 +3,13 @@ import { render, fireEvent, waitFor } from "@testing-library/react-native";
 import DatabaseTestScreen from "@/app/(tabs)/db";
 import { database } from "@/model";
 
+// The screen imports the sync module, but these UI tests do not exercise the
+// real network/file-system sync path. Mocking it keeps the test focused on the
+// WatermelonDB demo screen behavior.
+jest.mock("@/sync/sync", () => ({
+  syncSpace: jest.fn(),
+}));
+
 // 1. 模拟 @/model 中的 database 实例
 jest.mock("@/model", () => {
   const mockSubscribe = jest.fn((callback) => {
