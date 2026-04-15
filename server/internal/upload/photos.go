@@ -22,7 +22,7 @@ func SavePhotoFromForm(c *gin.Context) (remoteURL string, httpStatus int, err er
 		return "", http.StatusBadRequest, fmt.Errorf("接受文件失败: %w", err)
 	}
 
-	saveDir := config.GlobalConfig.SFHD
+	saveDir := filepath.Join(config.GlobalConfig.SFHD, "photos")
 	if err := os.MkdirAll(saveDir, os.ModePerm); err != nil {
 		return "", http.StatusInternalServerError, fmt.Errorf("服务器创建目录失败: %w", err)
 	}

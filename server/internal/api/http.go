@@ -2,7 +2,6 @@ package api
 
 import (
 	"errors"
-	"mime/multipart"
 	"net/http"
 	"strconv"
 	"travel/internal/db"
@@ -22,11 +21,6 @@ type PostSpacesRequest struct {
 type PostSyncRequest struct {
 	LastPulledAt *int64                           `json:"last_pulled_at" binding:"required"`
 	Changes      map[string]sync.SyncChangeBucket `json:"changes" binding:"required"`
-}
-
-type PhotosUploadRequest struct {
-	PhotoID string                `form:"photo_id" binding:"required"`
-	File    *multipart.FileHeader `form:"file" binding:"required"`
 }
 
 func HttpHello(c *gin.Context) {
@@ -154,11 +148,6 @@ func HttpPostPhotos(c *gin.Context) {
 		return
 	}
 
-	var req PhotosUploadRequest
-	if err := c.ShouldBind(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
 	if err := spaces.EnsureUserInSpace(userID, spaceID); err != nil {
 		if errors.Is(err, spaces.ErrUserNotInSpace) {
 			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
@@ -168,7 +157,7 @@ func HttpPostPhotos(c *gin.Context) {
 		return
 	}
 
-	remoteURL, status, err := upload.SavePhoto(userID, spaceID, req.PhotoID, req.File)
+	remoteURL, status, err := upload.SavePhotoFromForm(c)
 	if err != nil {
 		c.JSON(status, gin.H{"error": err.Error()})
 		return

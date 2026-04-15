@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+	"travel/internal/config"
 
 	"github.com/gin-gonic/gin"
 )
@@ -17,7 +18,7 @@ func SaveAvatarFromForm(c *gin.Context) (remoteURL string, httpStatus int, err e
 		return "", http.StatusBadRequest, fmt.Errorf("缺少文件字段 file: %w", err)
 	}
 
-	saveDir := "./photos"
+	saveDir := filepath.Join(config.GlobalConfig.SFHD, "avatars")
 	if err := os.MkdirAll(saveDir, os.ModePerm); err != nil {
 		return "", http.StatusInternalServerError, fmt.Errorf("创建目录失败: %w", err)
 	}
@@ -30,5 +31,7 @@ func SaveAvatarFromForm(c *gin.Context) (remoteURL string, httpStatus int, err e
 		return "", http.StatusInternalServerError, fmt.Errorf("保存文件失败: %w", err)
 	}
 
-	return fmt.Sprintf("http://127.0.0.1:8088/photos/%s", newFileName), http.StatusOK, nil
+	host := config.GlobalConfig.Host
+	port := config.GlobalConfig.Port
+	return fmt.Sprintf("%s:%d/avatars/%s", host, port, newFileName), http.StatusOK, nil
 }
