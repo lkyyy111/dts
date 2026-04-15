@@ -20,11 +20,6 @@ type SyncChanges struct {
 	Expenses     RecordChanges[db.Expense]     `json:"expenses"`
 }
 
-type LegacyPostSyncRequest struct {
-	LastPulledAt int64                       `json:"last_pulled_at"`
-	Changes      map[string]SyncChangeBucket `json:"changes"`
-}
-
 type SyncChangeBucket struct {
 	Created []json.RawMessage `json:"created"`
 	Updated []json.RawMessage `json:"updated"`

@@ -5,6 +5,7 @@ import (
 	// use other package within the module
 	"fmt"
 	"log"
+	"path/filepath"
 	"travel/internal/api"
 	"travel/internal/config"
 	"travel/internal/db"
@@ -48,7 +49,8 @@ func main() {
 	// 注册路由与接口
 	// 静态文件托管
 	static_file_host_dir := config.GlobalConfig.SFHD
-	r.Static("/photos", static_file_host_dir)
+	r.Static("/photos", filepath.Join(static_file_host_dir, "photos"))
+	r.Static("/avatars", filepath.Join(static_file_host_dir, "avatars"))
 	// 接口注册
 	r.GET("/hello", api.HttpHello)
 	r.POST("/api/v1/spaces", api.HttpPostSpaces)
