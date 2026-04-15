@@ -9,6 +9,5 @@ export default class Expense extends Model {
   @field("amount") amount!: number;
   @field("description") description!: string;
   @date("created_at") createdAt!: Date;
-  // Keep the decorator name aligned with data-design.md.
-  @date("upadted_at") updatedAt!: Date;
+  @date("updated_at") updatedAt!: Date;
 }

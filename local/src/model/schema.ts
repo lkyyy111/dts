@@ -38,8 +38,7 @@ export default appSchema({
         { name: "amount", type: "number" },
         { name: "description", type: "string" },
         { name: "created_at", type: "number" },
-        // Keep the raw column name aligned with data-design.md.
-        { name: "upadted_at", type: "number" },
+        { name: "updated_at", type: "number" },
       ],
     }),
     tableSchema({

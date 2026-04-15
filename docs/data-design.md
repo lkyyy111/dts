@@ -44,7 +44,7 @@ In the frontend, we use `watermelonDB`, which offers local-first capacity. The b
 |                       | amount            | Number   | 金额（小数点后两位）                                            |            |
 |                       | description       | String   | 消费描述 (如: 晚餐)                                             |            |
 |                       | created_at        | Number   | 这条记录初次记录的时间戳                                        |            |
-|                       | upadted_at        | Number   | 这条记录上次被修改的时间戳                                      |            |
+|                       | updated_at        | Number   | 这条记录上次被修改的时间戳                                      |            |
 |                       | deleted_at        | Number   | 这条记录被删除的时间戳                                          | 仅服务器有 |
 |                       | last_modified     |          |                                                                 | 仅服务器有 |
 |                       | server_created_at |          |                                                                 | 仅服务器有 |
