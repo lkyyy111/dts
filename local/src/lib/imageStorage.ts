@@ -128,7 +128,21 @@ async function ensureAlbumPermission() {
   albumPermissionGranted = true;
 }
 
+// ensureNamedAlbum 会尽量把资源放进指定名称的系统相册里。
+// 如果相册还不存在，就用当前资源创建；如果已存在，就把资源追加进去。
+async function ensureNamedAlbum(asset: MediaLibrary.Asset, albumName: string) {
+  const album = await MediaLibrary.getAlbumAsync(albumName);
+
+  if (!album) {
+    await MediaLibrary.createAlbumAsync(albumName, asset, false);
+    return;
+  }
+
+  await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+}
+
 // saveImageToAlbum 会尽量少复制一次文件，再把图片写入系统相册。
+// 这里不只保存到系统图库，还会尽量归档到调用方指定的相册名称下。
 export async function saveImageToAlbum(uri: string, folderName: string) {
   await ensureAlbumPermission();
 
@@ -139,6 +153,7 @@ export async function saveImageToAlbum(uri: string, folderName: string) {
     throw new Error("图片未能成功转成本地文件，暂时无法写入系统相册。");
   }
 
-  await MediaLibrary.saveToLibraryAsync(localImageUri);
+  const asset = await MediaLibrary.createAssetAsync(localImageUri);
+  await ensureNamedAlbum(asset, folderName);
   return localImageUri;
 }

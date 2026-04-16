@@ -1,6 +1,10 @@
 import { File, Paths } from "expo-file-system";
 import { synchronize } from "@nozbe/watermelondb/sync";
 
+import {
+  saveImageToAlbum,
+  saveImageToAppRelativePath,
+} from "@/lib/imageStorage";
 import { database } from "@/model";
 import Photo from "@/model/Photo";
 import { META_TABLES, SYNC_TABLES, type SyncTableName } from "@/model/tables";
@@ -19,6 +23,10 @@ import type {
 // WatermelonDB sync is not re-entrant for our use case. We keep the active
 // task here so repeated button taps can reuse the same in-flight sync.
 let activeSyncTask: Promise<void> | null = null;
+
+// When we mirror remote photos into the system gallery, we place them under one
+// stable album label so future adjustments stay centralized.
+const PHOTO_ALBUM_NAME = "DTS Travel";
 
 /**
  * Public sync entry for one "current sync context".
@@ -60,8 +68,10 @@ export async function syncSpace(input: SyncContext): Promise<void> {
  * - `pullChanges` is scoped by the current `spaceId`
  * - `pushChanges` sends global changes because WatermelonDB generates them
  *   globally instead of filtering by `space_id`
- * - after the database sync finishes, we run a second phase for photo file
- *   uploads because `/api/v1/photos` is separate from `/api/v1/sync`
+ * - after the database sync finishes, we run photo file compensation in two
+ *   directions:
+ *   - upload local-only photos that still have no `remote_url`
+ *   - download remote-only photos so they can render offline later
  */
 async function runSync(context: SyncContext): Promise<void> {
   const apiBaseUrl = getApiBaseUrl();
@@ -130,13 +140,15 @@ async function runSync(context: SyncContext): Promise<void> {
     migrationsEnabledAtVersion: 1,
   });
 
-  // Photo file upload is intentionally separated from WatermelonDB's record
-  // sync:
+  // Photo file compensation is intentionally separated from WatermelonDB's
+  // record sync:
   // - `/api/v1/sync` handles database rows
-  // - `/api/v1/photos` handles the actual file binary
+  // - `/api/v1/photos` handles upload binary
+  // - remote image download is a client-side storage concern
   //
-  // We run it after the main sync so record creation reaches the server first.
+  // We run these after the main sync so record metadata is settled first.
   await uploadPendingPhotos(apiBaseUrl, context.userId);
+  await downloadRemotePhotos();
 }
 
 /**
@@ -226,6 +238,26 @@ async function uploadPendingPhotos(
 }
 
 /**
+ * Downloads remote photos that are already known by the database but do not
+ * yet exist in local sandbox storage.
+ *
+ * Why this is a separate pass:
+ * - Pull only gives us metadata such as `remote_url`
+ * - offline rendering still needs a real file in app storage
+ * - saving to the system album is a local device concern, not part of the sync
+ *   protocol itself
+ */
+async function downloadRemotePhotos(): Promise<void> {
+  const photosCollection = database.collections.get<Photo>("photos");
+  const allPhotos = await photosCollection.query().fetch();
+  const albumSaveState = { shouldContinue: true };
+
+  for (const photo of allPhotos) {
+    await downloadSinglePhoto(photo, albumSaveState);
+  }
+}
+
+/**
  * Decides whether a photo still needs binary upload compensation.
  *
  * The backend fills `remote_url` after `/api/v1/photos` succeeds. Until a
@@ -234,6 +266,51 @@ async function uploadPendingPhotos(
  */
 function hasPendingPhotoUpload(photo: Photo): boolean {
   return !isNonEmptyString(photo.remoteUrl);
+}
+
+/**
+ * Downloads one remote photo into app storage when the local file is missing.
+ *
+ * The target path follows `data-design.md`:
+ * `${App storage}/photos/${photo_id}.jpg`
+ *
+ * After a successful download we also try to mirror the file into the system
+ * photo album. Album failures are treated as best-effort warnings so sync still
+ * succeeds and the app can at least render the sandbox copy offline.
+ */
+async function downloadSinglePhoto(
+  photo: Photo,
+  albumSaveState: { shouldContinue: boolean },
+): Promise<void> {
+  if (!isNonEmptyString(photo.remoteUrl)) {
+    return;
+  }
+
+  const existingLocalUri = findExistingLocalPhotoUri(photo);
+  if (existingLocalUri) {
+    if (existingLocalUri !== normalizeOptionalString(photo.localUri)) {
+      await persistPhotoLocalUri(photo, existingLocalUri);
+    }
+    return;
+  }
+
+  const downloadedLocalUri = await saveImageToAppRelativePath(
+    photo.remoteUrl.trim(),
+    getExpectedLocalPhotoRelativePath(photo.id),
+  );
+  if (!isFileUri(downloadedLocalUri) || !new File(downloadedLocalUri).exists) {
+    console.warn(
+      `[sync] skip photo download for ${photo.id}: could not materialize local file from ${photo.remoteUrl}`,
+    );
+    return;
+  }
+
+  await persistPhotoLocalUri(photo, downloadedLocalUri);
+  await savePhotoToAlbumBestEffort(
+    downloadedLocalUri,
+    photo.id,
+    albumSaveState,
+  );
 }
 
 /**
@@ -297,6 +374,83 @@ async function uploadSinglePhoto(
 }
 
 /**
+ * Persists the canonical local file path back into the photo record.
+ *
+ * This keeps the rendering layer simple: it can look at `local_uri` first and
+ * only fall back to `remote_url` when the file is genuinely unavailable.
+ */
+async function persistPhotoLocalUri(
+  photo: Photo,
+  localUri: string,
+): Promise<void> {
+  await database.write(async () => {
+    await photo.update((record) => {
+      // @ts-ignore Watermelon decorators on this model are currently untyped.
+      record.localUri = localUri;
+    });
+  });
+}
+
+/**
+ * Tries to save a downloaded photo into the system album without making sync
+ * depend on gallery permissions.
+ *
+ * We stop attempting album writes for the rest of the sync run after the first
+ * failure. That avoids repeatedly prompting or logging the same permission
+ * error for every remaining photo in the batch.
+ */
+async function savePhotoToAlbumBestEffort(
+  localUri: string,
+  photoId: string,
+  albumSaveState: { shouldContinue: boolean },
+): Promise<void> {
+  if (!albumSaveState.shouldContinue) {
+    return;
+  }
+
+  try {
+    await saveImageToAlbum(localUri, PHOTO_ALBUM_NAME);
+  } catch (error) {
+    albumSaveState.shouldContinue = false;
+    console.warn(
+      `[sync] downloaded photo ${photoId} into app storage, but failed to save it into the system album:`,
+      error,
+    );
+  }
+}
+
+/**
+ * Finds the best already-existing local URI for a photo.
+ *
+ * We check both:
+ * - the path already stored in `local_uri`
+ * - the canonical fallback path defined by `data-design.md`
+ *
+ * This lets the sync layer recover gracefully if older builds stored the file
+ * but did not yet backfill `local_uri`.
+ */
+function findExistingLocalPhotoUri(photo: Photo): string | null {
+  const candidates = [
+    normalizeOptionalString(photo.localUri),
+    getExpectedLocalPhotoFile(photo.id).uri,
+  ];
+  const seen = new Set<string>();
+
+  for (const candidate of candidates) {
+    if (!candidate || seen.has(candidate) || !isFileUri(candidate)) {
+      continue;
+    }
+
+    seen.add(candidate);
+    if (new File(candidate).exists) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Resolves the canonical local file location for a photo id.
  *
  * Keeping this path logic in one helper makes it easier to update later if the
@@ -304,6 +458,17 @@ async function uploadSinglePhoto(
  */
 function getExpectedLocalPhotoFile(photoId: string): File {
   return new File(Paths.document, "photos", `${photoId}.jpg`);
+}
+
+/**
+ * Returns the canonical relative sandbox path used when downloading a photo.
+ *
+ * `saveImageToAppRelativePath()` accepts relative paths, while rendering and
+ * upload checks often need the full `File` instance. Keeping both helpers makes
+ * those call sites stay simple and self-explanatory.
+ */
+function getExpectedLocalPhotoRelativePath(photoId: string): string {
+  return `photos/${photoId}.jpg`;
 }
 
 /**
@@ -425,6 +590,23 @@ function isSyncRecord(value: unknown): value is SyncRecord {
  */
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+/**
+ * Normalizes an optional string field from WatermelonDB into either a trimmed
+ * usable value or `""`.
+ */
+function normalizeOptionalString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/**
+ * Restricts local-file handling to real `file://` URIs.
+ *
+ * This avoids treating remote URLs as if they were sandbox file paths.
+ */
+function isFileUri(value: string): boolean {
+  return /^file:\/\//i.test(value);
 }
 
 /**

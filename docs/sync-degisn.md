@@ -60,3 +60,5 @@
     - remote_url为空，说明是你添加的图片。你需要post该photo，服务器会把remote_url填入服务器的数据库，你下次sync则会得到该remote_url。
     - 前端需处理photo表查到photo记录，但local_uri为空的异常情况
     - 这意味着，事实上photo只有create和delete，不会有update
+    - 若 `remote_url` 非空，但 `local_uri` 为空，或 `local_uri` 指向的本地文件已不存在，说明这条photo元数据已经同步到了本地，但图片文件本身还没落到设备上。此时前端应在sync完成后，把图片下载到 `${App存储目录}/photos/${photo_id}.jpg`，并把 `local_uri` 回写为这个本地路径。
+    - 下载成功后，前端可以继续尝试把这张图片写入手机系统相册（**需要安装expo-media-library**），方便用户在相册里直接看到；如果相册权限被拒绝，或写入相册失败，不影响本次sync整体成功，至少要保证App沙盒内已有可显示、可离线使用的本地文件。
