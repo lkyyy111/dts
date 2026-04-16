@@ -71,7 +71,10 @@ export default function DatabaseTestScreen() {
   const handleSyncCurrentSpace = async () => {
     try {
       setSyncStatus("同步中...");
-      await syncSpace(DEMO_SPACE_ID);
+      await syncSpace({
+        userId: DEMO_USER_ID,
+        spaceId: DEMO_SPACE_ID,
+      });
       setSyncStatus("同步成功");
     } catch (error) {
       const message = error instanceof Error ? error.message : "未知同步错误";
