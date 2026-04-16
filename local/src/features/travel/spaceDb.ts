@@ -9,7 +9,7 @@ import Space from "@/model/Space";
 import SpaceMember from "@/model/SpaceMember";
 import User from "@/model/User";
 import { markSpaceAsDisbanded } from "@/lib/disbandedSpaces";
-import { createUlid, nowTimestamp } from "@/lib/ids";
+import { nowTimestamp } from "@/lib/ids";
 import {
   assignModelId,
   assignTimestamps,
@@ -347,7 +347,7 @@ export async function createSpaceLocally(params: {
 
     if (existingMembers.length === 0) {
       await memberCollection.create((member) => {
-        assignModelId(member, createUlid());
+        assignModelId(member, `${cleanSpaceId}_${cleanUserId}`);
         member.spaceId = cleanSpaceId;
         member.userId = cleanUserId;
         const now = nowTimestamp();
